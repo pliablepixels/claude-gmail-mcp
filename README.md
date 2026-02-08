@@ -9,15 +9,12 @@ have claude CLI build one for me :-p
 
 ## Prerequisites
 
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) installed
 - A Gmail account with a generated [App Password](https://myaccount.google.com/apppasswords)
 
 ## Install
 
-```sh
-pip install claude-gmail-mcp
-```
-
-Then add the MCP server to Claude Code:
+Add the MCP server to Claude Code:
 
 ```sh
 claude mcp add gmail \

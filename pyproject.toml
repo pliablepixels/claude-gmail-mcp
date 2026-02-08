@@ -1,0 +1,16 @@
+[project]
+name = "claude-gmail-mcp"
+version = "0.1.0"
+description = "Gmail SMTP MCP server for Claude CLI"
+requires-python = ">=3.11"
+dependencies = ["mcp[cli]"]
+
+[project.scripts]
+claude-gmail-mcp = "server:mcp.run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

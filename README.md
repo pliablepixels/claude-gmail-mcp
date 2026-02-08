@@ -14,10 +14,10 @@ have claude CLI build one for me :-p
 
 ## Install
 
-Add the MCP server to Claude Code:
+Add the MCP server to Claude Code (this will make it available to all projects):
 
 ```sh
-claude mcp add gmail \
+claude mcp add gmail --scope user \
   -e GMAIL_ADDRESS=you@gmail.com \
   -e GMAIL_APP_PASSWORD=your-app-password \
   -- uvx claude-gmail-mcp
@@ -25,10 +25,10 @@ claude mcp add gmail \
 
 Replace `you@gmail.com` and `your-app-password` with your actual credentials.
 
-To make it available across all projects, add `--scope user`:
+To make it available to only the current project directory:
 
 ```sh
-claude mcp add gmail --scope user \
+claude mcp add gmail \
   -e GMAIL_ADDRESS=you@gmail.com \
   -e GMAIL_APP_PASSWORD=your-app-password \
   -- uvx claude-gmail-mcp

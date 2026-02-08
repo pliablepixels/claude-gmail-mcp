@@ -1,9 +1,15 @@
 [project]
 name = "claude-gmail-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Gmail SMTP MCP server for Claude CLI"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["mcp[cli]"]
+
+[project.urls]
+Homepage = "https://github.com/pliablepixels/claude-gmail-mcp"
+Repository = "https://github.com/pliablepixels/claude-gmail-mcp"
+Issues = "https://github.com/pliablepixels/claude-gmail-mcp/issues"
 
 [project.scripts]
 claude-gmail-mcp = "server:mcp.run"

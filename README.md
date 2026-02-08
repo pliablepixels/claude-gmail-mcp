@@ -58,3 +58,26 @@ Claude will use the `send_email` tool, which supports:
 - **body** - plain text or HTML body
 - **cc/bcc** - optional CC/BCC recipients
 - **html** - set to true to send HTML email
+
+## For Development
+
+```sh
+git clone https://github.com/pliablepixels/claude-gmail-mcp.git
+cd claude-gmail-mcp
+uv sync
+```
+
+Run the server locally:
+
+```sh
+uv run claude-gmail-mcp
+```
+
+To test with Claude Code using your local copy instead of the published package:
+
+```sh
+claude mcp add gmail \
+  -e GMAIL_ADDRESS=you@gmail.com \
+  -e GMAIL_APP_PASSWORD=your-app-password \
+  -- uv run --directory /path/to/claude-gmail-mcp claude-gmail-mcp
+```

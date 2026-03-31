@@ -37,3 +37,46 @@ def test_send_with_valid_attachment(mock_smtp, tmp_path):
     mock_smtp.sendmail.assert_called_once()
     raw = mock_smtp.sendmail.call_args[0][2]
     assert "report.txt" in raw
+
+
+def test_missing_attachment_skipped_with_warning(mock_smtp):
+    result = server.send_email(
+        to="recipient@example.com",
+        subject="Test",
+        body="Body",
+        attachments=["/nonexistent/path/file.pdf"],
+    )
+
+    assert "sent successfully" in result
+    assert "Warning" in result
+    assert "/nonexistent/path/file.pdf" in result
+    mock_smtp.sendmail.assert_called_once()
+
+
+def test_mixed_attachments_sends_valid_skips_missing(mock_smtp, tmp_path):
+    good = tmp_path / "good.txt"
+    good.write_text("data")
+
+    result = server.send_email(
+        to="recipient@example.com",
+        subject="Test",
+        body="Body",
+        attachments=[str(good), "/nonexistent/bad.pdf"],
+    )
+
+    assert "sent successfully" in result
+    assert "Warning" in result
+    assert "bad.pdf" in result
+    raw = mock_smtp.sendmail.call_args[0][2]
+    assert "good.txt" in raw
+
+
+def test_no_attachments_no_warning(mock_smtp):
+    result = server.send_email(
+        to="recipient@example.com",
+        subject="Test",
+        body="Body",
+    )
+
+    assert "sent successfully" in result
+    assert "Warning" not in result

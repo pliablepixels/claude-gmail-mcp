@@ -8,7 +8,6 @@ import server
 def gmail_env(monkeypatch):
     monkeypatch.setenv("GMAIL_ADDRESS", "sender@example.com")
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "secret")
-    import server
     monkeypatch.setattr(server, "GMAIL_ADDRESS", "sender@example.com")
     monkeypatch.setattr(server, "GMAIL_APP_PASSWORD", "secret")
 
@@ -67,6 +66,7 @@ def test_mixed_attachments_sends_valid_skips_missing(mock_smtp, tmp_path):
     assert "sent successfully" in result
     assert "Warning" in result
     assert "bad.pdf" in result
+    mock_smtp.sendmail.assert_called_once()
     raw = mock_smtp.sendmail.call_args[0][2]
     assert "good.txt" in raw
 

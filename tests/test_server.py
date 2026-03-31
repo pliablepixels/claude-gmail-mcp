@@ -7,6 +7,9 @@ from unittest.mock import patch, MagicMock
 def gmail_env(monkeypatch):
     monkeypatch.setenv("GMAIL_ADDRESS", "sender@example.com")
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "secret")
+    import server
+    monkeypatch.setattr(server, "GMAIL_ADDRESS", "sender@example.com")
+    monkeypatch.setattr(server, "GMAIL_APP_PASSWORD", "secret")
 
 
 @pytest.fixture

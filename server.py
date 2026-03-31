@@ -1,5 +1,7 @@
 import os
 import smtplib
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -19,6 +21,7 @@ def send_email(
     cc: str | list[str] | None = None,
     bcc: str | list[str] | None = None,
     html: bool = False,
+    attachments: list[str] | None = None,
 ) -> str:
     """Send an email via Gmail SMTP.
 
@@ -29,11 +32,12 @@ def send_email(
         cc: CC recipient(s), optional.
         bcc: BCC recipient(s), optional.
         html: If True, send body as HTML instead of plain text.
+        attachments: List of local file paths to attach, optional.
+            Files that cannot be read are skipped with a warning.
     """
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
         return "Error: GMAIL_ADDRESS and GMAIL_APP_PASSWORD environment variables must be set."
 
-    # Normalize recipients to lists
     if isinstance(to, str):
         to = [to]
     if isinstance(cc, str):
@@ -52,6 +56,24 @@ def send_email(
     content_type = "html" if html else "plain"
     msg.attach(MIMEText(body, content_type))
 
+    skipped = []
+    for path in attachments or []:
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+        except OSError:
+            skipped.append(f"could not attach '{path}' (file not found or unreadable)")
+            continue
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(data)
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=os.path.basename(path),
+        )
+        msg.attach(part)
+
     all_recipients = list(to)
     if cc:
         all_recipients.extend(cc)
@@ -64,7 +86,10 @@ def send_email(
             server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
             server.sendmail(GMAIL_ADDRESS, all_recipients, msg.as_string())
         recipient_summary = ", ".join(to)
-        return f"Email sent successfully to {recipient_summary} with subject '{subject}'."
+        result = f"Email sent successfully to {recipient_summary} with subject '{subject}'."
+        if skipped:
+            result += " Warning: " + "; ".join(skipped) + "."
+        return result
     except smtplib.SMTPAuthenticationError:
         return "Error: Authentication failed. Check your GMAIL_ADDRESS and GMAIL_APP_PASSWORD."
     except Exception as e:

@@ -18,3 +18,24 @@ def mock_smtp():
         instance = MagicMock()
         mock.return_value.__enter__.return_value = instance
         yield instance
+
+
+def test_send_with_valid_attachment(mock_smtp, tmp_path):
+    attachment = tmp_path / "report.txt"
+    attachment.write_text("hello")
+
+    import importlib, server
+    importlib.reload(server)
+
+    result = server.send_email(
+        to="recipient@example.com",
+        subject="Test",
+        body="Body",
+        attachments=[str(attachment)],
+    )
+
+    assert "sent successfully" in result
+    assert "Warning" not in result
+    mock_smtp.sendmail.assert_called_once()
+    raw = mock_smtp.sendmail.call_args[0][2]
+    assert "report.txt" in raw

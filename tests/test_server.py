@@ -1,6 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
+import server
 
 
 @pytest.fixture(autouse=True)
@@ -23,9 +24,6 @@ def mock_smtp():
 def test_send_with_valid_attachment(mock_smtp, tmp_path):
     attachment = tmp_path / "report.txt"
     attachment.write_text("hello")
-
-    import importlib, server
-    importlib.reload(server)
 
     result = server.send_email(
         to="recipient@example.com",

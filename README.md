@@ -61,6 +61,12 @@ Example with an attachment:
 
 > Send an email to alice@example.com with subject "Report" and attach ~/Documents/report.pdf
 
+## Publishing to PyPI
+
+```sh
+python -m build && twine upload dist/*
+```
+
 ## For Development
 
 ```sh

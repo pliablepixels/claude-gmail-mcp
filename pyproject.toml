@@ -1,6 +1,6 @@
 [project]
 name = "claude-gmail-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "Gmail SMTP MCP server for Claude CLI"
 readme = "README.md"
 requires-python = ">=3.11"

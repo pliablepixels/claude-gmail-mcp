@@ -55,6 +55,11 @@ Claude will use the `send_email` tool, which supports:
 - **body** - plain text or HTML body
 - **cc/bcc** - optional CC/BCC recipients
 - **html** - set to true to send HTML email
+- **attachments** - list of local file paths to attach (files that can't be read are skipped with a warning)
+
+Example with an attachment:
+
+> Send an email to alice@example.com with subject "Report" and attach ~/Documents/report.pdf
 
 ## For Development
 

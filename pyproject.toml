@@ -3,6 +3,7 @@ name = "claude-gmail-mcp"
 version = "0.1.2"
 description = "Gmail SMTP MCP server for Claude CLI"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = ["mcp[cli]"]
 

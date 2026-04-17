@@ -1,11 +1,17 @@
+import email
+import imaplib
 import os
 import smtplib
+from contextlib import contextmanager
 from email import encoders
+from email.header import decode_header as _decode_header
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from mcp.server.fastmcp import FastMCP
+
+imaplib._MAXLINE = 10_000_000
 
 mcp = FastMCP("gmail")
 
@@ -94,6 +100,112 @@ def send_email(
         return "Error: Authentication failed. Check your GMAIL_ADDRESS and GMAIL_APP_PASSWORD."
     except Exception as e:
         return f"Error sending email: {e}"
+
+
+def _decode_str(value: str | None) -> str:
+    if not value:
+        return ""
+    parts = _decode_header(value)
+    result = []
+    for part, charset in parts:
+        if isinstance(part, bytes):
+            result.append(part.decode(charset or "utf-8", errors="replace"))
+        else:
+            result.append(part)
+    return "".join(result)
+
+
+@contextmanager
+def _imap():
+    mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+    try:
+        mail.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+        yield mail
+    finally:
+        try:
+            mail.logout()
+        except Exception:
+            pass
+
+
+@mcp.tool()
+def search_emails(query: str, max_results: int = 10) -> str:
+    """Search Gmail using full Gmail search syntax (from:, subject:, is:unread, etc).
+    Returns UID, sender, subject, and date for each match.
+
+    Args:
+        query: Gmail search query, e.g. 'is:unread subject:invoice'
+        max_results: Max emails to return (default 10)
+    """
+    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+        return "Error: GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set."
+    try:
+        with _imap() as mail:
+            mail.select('"[Gmail]/All Mail"', readonly=True)
+            _, data = mail.uid("search", "X-GM-RAW", query)
+            uids = data[0].split()
+            if not uids:
+                return "No messages found."
+            uids = uids[-max_results:][::-1]
+            uid_list = b",".join(uids)
+            _, msgs = mail.uid(
+                "fetch", uid_list, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])"
+            )
+        results = []
+        for part in msgs:
+            if not isinstance(part, tuple):
+                continue
+            uid_info, raw_headers = part
+            uid = uid_info.decode().split()[2]
+            msg = email.message_from_bytes(raw_headers)
+            results.append(
+                f"[uid:{uid}] {_decode_str(msg['Date'])} | "
+                f"From: {_decode_str(msg['From'])} | "
+                f"Subject: {_decode_str(msg['Subject'])}"
+            )
+        return "\n".join(results) if results else "No messages found."
+    except imaplib.IMAP4.error as e:
+        return f"IMAP error: {e}"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def read_email(uid: str) -> str:
+    """Fetch the full content of an email by its UID (from search_emails results).
+
+    Args:
+        uid: Email UID shown in search_emails output
+    """
+    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+        return "Error: GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set."
+    try:
+        with _imap() as mail:
+            mail.select('"[Gmail]/All Mail"', readonly=True)
+            _, data = mail.uid("fetch", uid, "(RFC822)")
+        raw = data[0][1]
+        msg = email.message_from_bytes(raw)
+        lines = [
+            f"From: {_decode_str(msg['From'])}",
+            f"To: {_decode_str(msg['To'])}",
+            f"Subject: {_decode_str(msg['Subject'])}",
+            f"Date: {msg['Date']}",
+            "",
+        ]
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == "text/plain" and not part.get_filename():
+                    charset = part.get_content_charset() or "utf-8"
+                    lines.append(part.get_payload(decode=True).decode(charset, errors="replace"))
+                    break
+        else:
+            charset = msg.get_content_charset() or "utf-8"
+            lines.append(msg.get_payload(decode=True).decode(charset, errors="replace"))
+        return "\n".join(lines)
+    except imaplib.IMAP4.error as e:
+        return f"IMAP error: {e}"
+    except Exception as e:
+        return f"Error: {e}"
 
 
 if __name__ == "__main__":

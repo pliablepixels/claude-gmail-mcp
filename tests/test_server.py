@@ -11,6 +11,7 @@ def gmail_env(monkeypatch):
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "secret")
     monkeypatch.setattr(backend, "GMAIL_ADDRESS", "sender@example.com")
     monkeypatch.setattr(backend, "GMAIL_APP_PASSWORD", "secret")
+    monkeypatch.setattr(server, "backend", backend)
 
 
 @pytest.fixture

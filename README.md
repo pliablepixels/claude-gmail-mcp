@@ -2,19 +2,39 @@
 
 [![PyPI](https://img.shields.io/pypi/v/claude-gmail-mcp)](https://pypi.org/project/claude-gmail-mcp/)
 
-A super tiny Gmail MCP server for Claude Code. Lets Claude send emails on your behalf via Gmail SMTP.
-I needed something for my projects - there were a bunch around which seemed super complicated. So why not
-have claude CLI build one for me :-p
+A super tiny Gmail MCP server for Claude Code. Lets Claude send, search, and read Gmail on your behalf.
 
+Two backends are supported and auto-selected at startup:
+
+- **Gmail API (OAuth)** — recommended. No app password. Batch search. Direct Gmail web URLs on every result.
+- **SMTP/IMAP (app password)** — simpler setup. Fallback when the OAuth token isn't present.
+
+I needed something for my projects — there were a bunch around which seemed super complicated. So why not have Claude CLI build one for me :-p
 
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) installed
-- A Gmail account with a generated [App Password](https://myaccount.google.com/apppasswords)
+- One of:
+  - A Google Cloud OAuth client (Desktop app) — for the API backend, OR
+  - A Gmail [App Password](https://myaccount.google.com/apppasswords) — for the SMTP/IMAP backend
 
-## Install
+## Install (Gmail API backend — recommended)
 
-Add the MCP server to Claude Code (this will make it available to all projects):
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project, enable the Gmail API, and configure the OAuth consent screen (External, add your Gmail as a test user). Create an OAuth client of type **Desktop app** and download the credentials JSON.
+2. Run the auth helper, pointing at the downloaded file:
+
+   ```sh
+   uvx --from claude-gmail-mcp claude-gmail-mcp-auth /path/to/credentials.json
+   ```
+
+   Browser opens → sign in → approve (scope: `gmail.modify`). Refresh token is saved to `~/.config/claude-gmail-mcp/token.json` (perms `600`).
+3. Register the MCP server with Claude Code (no env vars needed):
+
+   ```sh
+   claude mcp add gmail --scope user -- uvx claude-gmail-mcp
+   ```
+
+## Install (SMTP/IMAP backend — fallback)
 
 ```sh
 claude mcp add gmail --scope user \
@@ -23,16 +43,7 @@ claude mcp add gmail --scope user \
   -- uvx claude-gmail-mcp
 ```
 
-Replace `you@gmail.com` and `your-app-password` with your actual credentials.
-
-To make it available to only the current project directory:
-
-```sh
-claude mcp add gmail \
-  -e GMAIL_ADDRESS=you@gmail.com \
-  -e GMAIL_APP_PASSWORD=your-app-password \
-  -- uvx claude-gmail-mcp
-```
+Replace `you@gmail.com` and `your-app-password` with your actual credentials. Drop `--scope user` to install only for the current project directory.
 
 ## Verify
 
@@ -40,58 +51,43 @@ claude mcp add gmail \
 claude mcp list
 ```
 
-You should see `gmail` listed as a configured server.
+You should see `gmail` listed as a configured server. To see which backend is active, run:
 
-## Using the Gmail API backend (optional)
+```sh
+uvx claude-gmail-mcp 2>&1 | head -1
+```
 
-Instead of an app password, you can use an OAuth token and the Gmail API. With this backend:
+Expected: `[gmail-mcp] backend=api` or `[gmail-mcp] backend=imap`. Ctrl-C to exit.
 
-- No app password required (OAuth-based auth).
-- Batch search: pass a list of queries to `search_emails` and they run in one HTTP roundtrip.
-- A direct Gmail web URL is included with every search/read result.
+## Backend selection
 
-### One-time setup
+At startup the server picks exactly one backend:
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create a project, enable the Gmail API, and create an OAuth client of type **Desktop app**. Download the credentials JSON.
-2. Run the auth helper, pointing at the downloaded file:
+1. Token file at `GMAIL_TOKEN_PATH` (default `~/.config/claude-gmail-mcp/token.json`) exists → **API backend**.
+2. Else `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` env vars set → **IMAP backend**.
+3. Else tools return a "no backend configured" error.
 
-   ```sh
-   uvx --from claude-gmail-mcp claude-gmail-mcp-auth /path/to/credentials.json
-   ```
-
-   This opens your browser, you grant access (scope: `gmail.modify`), and a refresh token is saved to `~/.config/claude-gmail-mcp/token.json`.
-3. Add the MCP server (no env vars needed if the default token path is used):
-
-   ```sh
-   claude mcp add gmail --scope user -- uvx claude-gmail-mcp
-   ```
-
-The server picks the API backend automatically when the token file exists. Delete the token file (or set `GMAIL_TOKEN_PATH` to a missing path) to fall back to the SMTP/IMAP path.
-
-### Batch search example
-
-> Search Gmail for "is:unread from:alice" and "is:unread from:bob" — show me both lists side by side.
-
-Claude will pass both queries in a single tool call, and the response will be sectioned per query.
+To force a switch to the IMAP backend when a token file exists, set `GMAIL_TOKEN_PATH` to a non-existent path (or delete the token file).
 
 ## Usage
 
-Once installed, ask Claude to send an email:
+Ask Claude to send an email:
 
 > Send an email to alice@example.com with subject "Hello" and body "Hi from Claude!"
 
-Claude will use the `send_email` tool, which supports:
+Tools exposed:
 
-- **to** - recipient address(es)
-- **subject** - email subject
-- **body** - plain text or HTML body
-- **cc/bcc** - optional CC/BCC recipients
-- **html** - set to true to send HTML email
-- **attachments** - list of local file paths to attach (files that can't be read are skipped with a warning)
+- **`send_email`** — `to`, `subject`, `body`, optional `cc`/`bcc`, `html`, `attachments` (local file paths; unreadable files are skipped with a warning).
+- **`search_emails`** — `queries` (single string or list of strings), `max_results` (per query when a list is passed). Results include the Gmail message ID in hex and a direct Gmail web URL per hit.
+- **`read_email`** — `uid` (the hex ID from `search_emails`). Output includes the Gmail web URL at the top.
 
-`search_emails` accepts either a single query string or a list of query strings. With a list, results are sectioned per query and `max_results` applies per query.
+Batch search example:
 
-Example with an attachment:
+> Search Gmail for "is:unread from:alice" and "is:unread from:bob" — show me both side by side.
+
+Claude passes both queries in a single tool call. The response is sectioned per query. API backend executes the list step in one HTTP roundtrip; IMAP backend iterates.
+
+Attachment example:
 
 > Send an email to alice@example.com with subject "Report" and attach ~/Documents/report.pdf
 
@@ -107,6 +103,7 @@ python -m build && twine upload dist/*
 git clone https://github.com/pliablepixels/claude-gmail-mcp.git
 cd claude-gmail-mcp
 uv sync
+uv run pytest
 ```
 
 Run the server locally:
@@ -115,11 +112,11 @@ Run the server locally:
 uv run claude-gmail-mcp
 ```
 
-To test with Claude Code using your local copy instead of the published package:
+Test with Claude Code using your local copy instead of the published package:
 
 ```sh
-claude mcp add gmail \
-  -e GMAIL_ADDRESS=you@gmail.com \
-  -e GMAIL_APP_PASSWORD=your-app-password \
+claude mcp add gmail --scope user \
   -- uv run --directory /path/to/claude-gmail-mcp claude-gmail-mcp
 ```
+
+(For the IMAP backend add `-e GMAIL_ADDRESS=... -e GMAIL_APP_PASSWORD=...`.)

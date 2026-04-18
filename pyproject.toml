@@ -1,7 +1,7 @@
 [project]
 name = "claude-gmail-mcp"
-version = "0.1.2"
-description = "Gmail SMTP MCP server for Claude CLI"
+version = "0.2.0"
+description = "Gmail MCP server for Claude CLI — API (OAuth) and SMTP/IMAP backends"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"

@@ -51,17 +51,22 @@ def send_email(
 
 
 @mcp.tool()
-def search_emails(query: str, max_results: int = 10) -> str:
+def search_emails(queries: str | list[str], max_results: int = 10) -> str:
     """Search Gmail using full Gmail search syntax (from:, subject:, is:unread, etc).
-    Returns UID, sender, subject, and date for each match.
+
+    Pass a single query string for a flat list of results, or a list of queries
+    to run several searches in one call (output is sectioned by query, and
+    max_results applies per query).
+
+    Returns UID, sender, subject, date, and a Gmail web URL for each match.
 
     Args:
-        query: Gmail search query, e.g. 'is:unread subject:invoice'
-        max_results: Max emails to return (default 10)
+        queries: Single query string or list of query strings.
+        max_results: Max emails to return per query (default 10).
     """
     if backend is None:
         return _NO_BACKEND_MSG
-    return backend.search_emails(query, max_results=max_results)
+    return backend.search_emails(queries, max_results=max_results)
 
 
 @mcp.tool()

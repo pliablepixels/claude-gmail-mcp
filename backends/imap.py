@@ -111,38 +111,53 @@ def _imap():
             pass
 
 
-def search_emails(query: str, max_results: int = 10) -> str:
+def search_emails(queries: str | list[str], max_results: int = 10) -> str:
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
         return "Error: GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set."
+
+    is_batch = isinstance(queries, list)
+    query_list = queries if is_batch else [queries]
+
     try:
+        sections = []
         with _imap() as mail:
             mail.select('"[Gmail]/All Mail"', readonly=True)
-            _, data = mail.uid("search", "X-GM-RAW", query)
-            uids = data[0].split()
-            if not uids:
-                return "No messages found."
-            uids = uids[-max_results:][::-1]
-            uid_list = b",".join(uids)
-            _, msgs = mail.uid(
-                "fetch", uid_list, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])"
-            )
-        results = []
-        for part in msgs:
-            if not isinstance(part, tuple):
-                continue
-            uid_info, raw_headers = part
-            uid = uid_info.decode().split()[2]
-            msg = email.message_from_bytes(raw_headers)
-            results.append(
-                f"[uid:{uid}] {_decode_str(msg['Date'])} | "
-                f"From: {_decode_str(msg['From'])} | "
-                f"Subject: {_decode_str(msg['Subject'])}"
-            )
-        return "\n".join(results) if results else "No messages found."
+            for query in query_list:
+                section = _search_one(mail, query, max_results)
+                if is_batch:
+                    sections.append(f"=== Query: {query} ===\n{section}")
+                else:
+                    sections.append(section)
+        return "\n\n".join(sections)
     except imaplib.IMAP4.error as e:
         return f"IMAP error: {e}"
     except Exception as e:
         return f"Error: {e}"
+
+
+def _search_one(mail, query: str, max_results: int) -> str:
+    _, data = mail.uid("search", "X-GM-RAW", query)
+    uids = data[0].split()
+    if not uids:
+        return "No messages found."
+    uids = uids[-max_results:][::-1]
+    uid_list = b",".join(uids)
+    _, msgs = mail.uid(
+        "fetch", uid_list, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])"
+    )
+    results = []
+    for part in msgs:
+        if not isinstance(part, tuple):
+            continue
+        uid_info, raw_headers = part
+        uid = uid_info.decode().split()[2]
+        msg = email.message_from_bytes(raw_headers)
+        results.append(
+            f"[uid:{uid}] {_decode_str(msg['Date'])} | "
+            f"From: {_decode_str(msg['From'])} | "
+            f"Subject: {_decode_str(msg['Subject'])}"
+        )
+    return "\n".join(results) if results else "No messages found."
 
 
 def read_email(uid: str) -> str:

@@ -5,7 +5,12 @@ description = "Gmail SMTP MCP server for Claude CLI"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = ["mcp[cli]"]
+dependencies = [
+    "mcp[cli]",
+    "google-api-python-client",
+    "google-auth",
+    "google-auth-oauthlib",
+]
 
 [project.urls]
 Homepage = "https://github.com/pliablepixels/claude-gmail-mcp"

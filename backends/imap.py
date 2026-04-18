@@ -2,6 +2,8 @@ import email
 import imaplib
 import os
 import smtplib
+
+import links
 from contextlib import contextmanager
 from email import encoders
 from email.header import decode_header as _decode_header
@@ -143,19 +145,27 @@ def _search_one(mail, query: str, max_results: int) -> str:
     uids = uids[-max_results:][::-1]
     uid_list = b",".join(uids)
     _, msgs = mail.uid(
-        "fetch", uid_list, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])"
+        "fetch",
+        uid_list,
+        "(X-GM-MSGID BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])",
     )
     results = []
     for part in msgs:
         if not isinstance(part, tuple):
             continue
         uid_info, raw_headers = part
-        uid = uid_info.decode().split()[2]
+        # uid_info looks like:
+        #   b"42 (X-GM-MSGID 1655752825319194624 BODY[HEADER...] {N}"
+        text = uid_info.decode()
+        msgid_decimal = text.split("X-GM-MSGID")[1].split()[0]
+        msgid_hex = links.msgid_decimal_to_hex(msgid_decimal)
         msg = email.message_from_bytes(raw_headers)
+        url = links.gmail_url(msgid_hex, GMAIL_ADDRESS)
         results.append(
-            f"[uid:{uid}] {_decode_str(msg['Date'])} | "
+            f"[uid:{msgid_hex}] {_decode_str(msg['Date'])} | "
             f"From: {_decode_str(msg['From'])} | "
-            f"Subject: {_decode_str(msg['Subject'])}"
+            f"Subject: {_decode_str(msg['Subject'])}\n"
+            f"  → {url}"
         )
     return "\n".join(results) if results else "No messages found."
 
@@ -163,13 +173,25 @@ def _search_one(mail, query: str, max_results: int) -> str:
 def read_email(uid: str) -> str:
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
         return "Error: GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set."
+    msgid_hex = uid
+    try:
+        msgid_decimal = links.msgid_hex_to_decimal(msgid_hex)
+    except ValueError:
+        return f"Error: invalid Gmail message ID '{uid}' (expected hex)."
+
     try:
         with _imap() as mail:
             mail.select('"[Gmail]/All Mail"', readonly=True)
-            _, data = mail.uid("fetch", uid, "(RFC822)")
+            _, search_data = mail.uid("search", "X-GM-MSGID", msgid_decimal)
+            imap_uids = search_data[0].split()
+            if not imap_uids:
+                return f"No message found for id {msgid_hex}."
+            _, data = mail.uid("fetch", imap_uids[0], "(RFC822)")
         raw = data[0][1]
         msg = email.message_from_bytes(raw)
+        url = links.gmail_url(msgid_hex, GMAIL_ADDRESS)
         lines = [
+            url,
             f"From: {_decode_str(msg['From'])}",
             f"To: {_decode_str(msg['To'])}",
             f"Subject: {_decode_str(msg['Subject'])}",

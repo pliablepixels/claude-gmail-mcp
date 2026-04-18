@@ -19,6 +19,7 @@ Issues = "https://github.com/pliablepixels/claude-gmail-mcp/issues"
 
 [project.scripts]
 claude-gmail-mcp = "server:mcp.run"
+claude-gmail-mcp-auth = "auth:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]

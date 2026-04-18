@@ -1,8 +1,35 @@
+import sys
+
 from mcp.server.fastmcp import FastMCP
 
-from backends import imap as backend
+import backends
 
 mcp = FastMCP("gmail")
+
+# Lazy initialization: backend is set on first function call
+_backend = None
+_backend_initialized = False
+
+
+def _ensure_backend_initialized():
+    global _backend, _backend_initialized
+    if not _backend_initialized:
+        _backend = backends.detect_backend()
+        _backend_initialized = True
+        if _backend is None:
+            print(
+                "[gmail-mcp] no backend configured: set GMAIL_ADDRESS+GMAIL_APP_PASSWORD, "
+                "or run 'uvx claude-gmail-mcp-auth <credentials.json>'",
+                file=sys.stderr,
+            )
+        else:
+            print(f"[gmail-mcp] backend={_backend.__name__.split('.')[-1]}", file=sys.stderr)
+
+
+_NO_BACKEND_MSG = (
+    "No backend configured. Set GMAIL_ADDRESS+GMAIL_APP_PASSWORD, "
+    "or run 'uvx claude-gmail-mcp-auth <credentials.json>'."
+)
 
 
 @mcp.tool()
@@ -27,7 +54,10 @@ def send_email(
         attachments: List of local file paths to attach, optional.
             Files that cannot be read are skipped with a warning.
     """
-    return backend.send_email(to, subject, body, cc=cc, bcc=bcc, html=html, attachments=attachments)
+    _ensure_backend_initialized()
+    if _backend is None:
+        return _NO_BACKEND_MSG
+    return _backend.send_email(to, subject, body, cc=cc, bcc=bcc, html=html, attachments=attachments)
 
 
 @mcp.tool()
@@ -39,7 +69,10 @@ def search_emails(query: str, max_results: int = 10) -> str:
         query: Gmail search query, e.g. 'is:unread subject:invoice'
         max_results: Max emails to return (default 10)
     """
-    return backend.search_emails(query, max_results=max_results)
+    _ensure_backend_initialized()
+    if _backend is None:
+        return _NO_BACKEND_MSG
+    return _backend.search_emails(query, max_results=max_results)
 
 
 @mcp.tool()
@@ -49,7 +82,10 @@ def read_email(uid: str) -> str:
     Args:
         uid: Email UID shown in search_emails output
     """
-    return backend.read_email(uid)
+    _ensure_backend_initialized()
+    if _backend is None:
+        return _NO_BACKEND_MSG
+    return _backend.read_email(uid)
 
 
 if __name__ == "__main__":

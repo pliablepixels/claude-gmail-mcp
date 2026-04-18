@@ -21,7 +21,8 @@ def detect_backend():
     import-time side effects when the other is selected.
     """
     if _token_path().is_file():
-        return None  # API backend wired in Task 11.
+        from backends import api as api_backend
+        return api_backend
     if os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD"):
         from backends import imap as imap_backend
         return imap_backend

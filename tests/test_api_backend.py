@@ -27,6 +27,26 @@ def cached_account_email(monkeypatch):
     monkeypatch.setattr(backend, "_SERVICE", None)
 
 
+def _install_batch(service):
+    """Wire a synchronous fake batch on the service mock. Invokes each added
+    callback with whatever response the .list().execute() mock is configured to return."""
+    batch = MagicMock()
+    added: list = []
+
+    def _add(request, callback=None, request_id=None):
+        added.append((request_id, callback))
+
+    def _execute():
+        list_resp = service.users().messages().list().execute.return_value
+        for req_id, cb in added:
+            cb(req_id, list_resp, None)
+
+    batch.add.side_effect = _add
+    batch.execute.side_effect = _execute
+    service.new_batch_http_request.return_value = batch
+    return batch
+
+
 def test_send_email_calls_users_messages_send_with_base64url_raw(fake_service):
     fake_service.users().messages().send().execute.return_value = {"id": "abc"}
 
@@ -77,3 +97,51 @@ def test_send_email_skips_missing_attachment_with_warning(fake_service):
     assert "sent successfully" in result
     assert "Warning" in result
     assert "/nonexistent/file.pdf" in result
+
+
+def test_search_emails_single_query(fake_service):
+    fake_service.users().messages().list().execute.return_value = {
+        "messages": [{"id": "16fa6a6c0d000000"}]
+    }
+    fake_service.users().messages().get().execute.return_value = {
+        "id": "16fa6a6c0d000000",
+        "payload": {
+            "headers": [
+                {"name": "From", "value": "alice@example.com"},
+                {"name": "Subject", "value": "Hello"},
+                {"name": "Date", "value": "Sat, 18 Apr 2026 10:00:00 +0000"},
+            ]
+        },
+    }
+    _install_batch(fake_service)
+
+    result = backend.search_emails("is:unread", max_results=5)
+
+    assert "[uid:16fa6a6c0d000000]" in result
+    assert "From: alice@example.com" in result
+    assert "https://mail.google.com/mail/u/you@example.com/#all/16fa6a6c0d000000" in result
+    assert "=== Query:" not in result
+
+
+def test_search_emails_batch_uses_batch_http_request(fake_service):
+    fake_service.users().messages().list().execute.return_value = {
+        "messages": [{"id": "abc"}]
+    }
+    fake_service.users().messages().get().execute.return_value = {
+        "id": "abc",
+        "payload": {
+            "headers": [
+                {"name": "From", "value": "x@example.com"},
+                {"name": "Subject", "value": "S"},
+                {"name": "Date", "value": "D"},
+            ]
+        },
+    }
+    batch = _install_batch(fake_service)
+
+    result = backend.search_emails(["q1", "q2"], max_results=5)
+
+    assert "=== Query: q1 ===" in result
+    assert "=== Query: q2 ===" in result
+    assert fake_service.new_batch_http_request.called
+    assert batch.execute.called

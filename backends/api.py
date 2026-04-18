@@ -118,3 +118,68 @@ def send_email(
     if skipped:
         result += " Warning: " + "; ".join(skipped) + "."
     return result
+
+
+def search_emails(queries: str | list[str], max_results: int = 10) -> str:
+    is_batch = isinstance(queries, list)
+    query_list = queries if is_batch else [queries]
+
+    try:
+        per_query_results = _run_searches(query_list, max_results)
+    except RefreshError:
+        return _AUTH_RETRY_MSG
+    except HttpError as e:
+        return _format_http_error(e)
+
+    if is_batch:
+        sections = [
+            f"=== Query: {q} ===\n{per_query_results[q]}" for q in query_list
+        ]
+        return "\n\n".join(sections)
+    return per_query_results[query_list[0]]
+
+
+def _run_searches(query_list: list[str], max_results: int) -> dict[str, str]:
+    results: dict[str, list[str]] = {q: [] for q in query_list}
+    ids_per_query: dict[str, list[str]] = {q: [] for q in query_list}
+
+    service = _service()
+
+    def _make_callback(query: str):
+        def _cb(request_id, response, exception):
+            if exception is not None:
+                raise exception
+            ids_per_query[query] = [m["id"] for m in response.get("messages", [])]
+        return _cb
+
+    batch = service.new_batch_http_request()
+    for i, query in enumerate(query_list):
+        req = service.users().messages().list(
+            userId="me", q=query, maxResults=max_results
+        )
+        batch.add(req, callback=_make_callback(query), request_id=str(i))
+    batch.execute()
+
+    for query, ids in ids_per_query.items():
+        for msg_id in ids:
+            msg = (
+                service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=msg_id,
+                    format="metadata",
+                    metadataHeaders=["From", "Subject", "Date"],
+                )
+                .execute()
+            )
+            headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
+            url = links.gmail_url(msg_id, _account_email())
+            results[query].append(
+                f"[uid:{msg_id}] {headers.get('Date', '')} | "
+                f"From: {headers.get('From', '')} | "
+                f"Subject: {headers.get('Subject', '')}\n"
+                f"  → {url}"
+            )
+
+    return {q: "\n".join(lines) if lines else "No messages found." for q, lines in results.items()}

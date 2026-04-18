@@ -95,21 +95,21 @@ def test_gmail_url_handles_plus_alias():
 
 
 def test_msgid_decimal_to_hex_accepts_int():
-    assert links.msgid_decimal_to_hex(1656870898400000000) == "16fa6a6c0d000000"
+    assert links.msgid_decimal_to_hex(1655752825319194624) == "16fa6a6c0d000000"
 
 
 def test_msgid_decimal_to_hex_accepts_str():
-    assert links.msgid_decimal_to_hex("1656870898400000000") == "16fa6a6c0d000000"
+    assert links.msgid_decimal_to_hex("1655752825319194624") == "16fa6a6c0d000000"
 
 
 def test_msgid_hex_to_decimal_round_trip():
-    decimal = "1656870898400000000"
+    decimal = "1655752825319194624"
     hex_form = links.msgid_decimal_to_hex(decimal)
     assert links.msgid_hex_to_decimal(hex_form) == decimal
 
 
 def test_msgid_hex_to_decimal_strips_optional_0x_prefix():
-    assert links.msgid_hex_to_decimal("0x16fa6a6c0d000000") == "1656870898400000000"
+    assert links.msgid_hex_to_decimal("0x16fa6a6c0d000000") == "1655752825319194624"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -726,7 +726,7 @@ def _patch_imap(monkeypatch, mail):
 
 def test_search_emails_accepts_list_returns_sectioned_output(monkeypatch):
     headers_a = b"From: alice@example.com\r\nSubject: Hello\r\nDate: Sat, 18 Apr 2026 10:00:00 +0000\r\n\r\n"
-    mail = _make_imap_mock({b"42": (b"1656870898400000000", headers_a)})
+    mail = _make_imap_mock({b"42": (b"1655752825319194624", headers_a)})
     _patch_imap(monkeypatch, mail)
 
     result = backend.search_emails(["is:unread", "from:bob"], max_results=5)
@@ -738,7 +738,7 @@ def test_search_emails_accepts_list_returns_sectioned_output(monkeypatch):
 
 def test_search_emails_string_input_keeps_unsectioned_output(monkeypatch):
     headers_a = b"From: alice@example.com\r\nSubject: Hello\r\nDate: Sat, 18 Apr 2026 10:00:00 +0000\r\n\r\n"
-    mail = _make_imap_mock({b"42": (b"1656870898400000000", headers_a)})
+    mail = _make_imap_mock({b"42": (b"1655752825319194624", headers_a)})
     _patch_imap(monkeypatch, mail)
 
     result = backend.search_emails("is:unread", max_results=5)
@@ -864,7 +864,7 @@ def test_search_results_include_hex_msgid_and_url(monkeypatch):
     """X-GM-MSGID arrives as decimal; output should expose hex + web URL."""
     msgid_hex = "16fa6a6c0d000000"
     headers = b"From: alice@example.com\r\nSubject: Hello\r\nDate: Sat, 18 Apr 2026 10:00:00 +0000\r\n\r\n"
-    mail = _make_imap_mock({b"42": (b"1656870898400000000", headers)})
+    mail = _make_imap_mock({b"42": (b"1655752825319194624", headers)})
     _patch_imap(monkeypatch, mail)
 
     result = backend.search_emails("is:unread", max_results=5)
@@ -875,7 +875,7 @@ def test_search_results_include_hex_msgid_and_url(monkeypatch):
 
 def test_read_email_accepts_hex_id_and_includes_url(monkeypatch):
     msgid_hex = "16fa6a6c0d000000"
-    msgid_decimal = "1656870898400000000"
+    msgid_decimal = "1655752825319194624"
 
     rfc822 = (
         b"From: alice@example.com\r\n"
@@ -946,7 +946,7 @@ def _search_one(mail, query: str, max_results: int) -> str:
             continue
         uid_info, raw_headers = part
         # uid_info looks like:
-        #   b"42 (X-GM-MSGID 1656870898400000000 BODY[HEADER...] {N}"
+        #   b"42 (X-GM-MSGID 1655752825319194624 BODY[HEADER...] {N}"
         text = uid_info.decode()
         msgid_decimal = text.split("X-GM-MSGID")[1].split()[0]
         msgid_hex = links.msgid_decimal_to_hex(msgid_decimal)

@@ -1691,16 +1691,20 @@ def detect_backend():
       1. Token file at GMAIL_TOKEN_PATH (or default) → API backend.
       2. GMAIL_ADDRESS + GMAIL_APP_PASSWORD env → IMAP backend.
       3. None.
+
+    Backend modules are lazy-imported so we don't trigger one backend's
+    import-time side effects when the other is selected.
     """
     if _token_path().is_file():
         from backends import api as api_backend
         return api_backend
     if os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD"):
+        from backends import imap as imap_backend
         return imap_backend
     return None
 ```
 
-(Lazy-import keeps the IMAP-only install from failing if Google deps were ever skipped.)
+Both backend imports are inside `detect_backend()` (already established in Task 4 — keep both lazy here so an IMAP-only install isn't forced to import the Google libs, and the IMAP module's `imaplib._MAXLINE` mutation doesn't fire when the API backend is active).
 
 - [ ] **Step 4: Run all tests**
 

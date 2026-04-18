@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-from backends import imap as imap_backend
-
 DEFAULT_TOKEN_PATH = Path.home() / ".config" / "claude-gmail-mcp" / "token.json"
 
 
@@ -18,9 +16,13 @@ def detect_backend():
       1. Token file at GMAIL_TOKEN_PATH (or default) → API backend (added in a later task).
       2. GMAIL_ADDRESS + GMAIL_APP_PASSWORD env → IMAP backend.
       3. None.
+
+    Backend modules are lazy-imported so we don't trigger one backend's
+    import-time side effects when the other is selected.
     """
     if _token_path().is_file():
         return None  # API backend wired in Task 11.
     if os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD"):
+        from backends import imap as imap_backend
         return imap_backend
     return None

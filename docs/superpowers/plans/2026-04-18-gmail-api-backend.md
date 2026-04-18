@@ -1061,6 +1061,7 @@ def fake_credentials():
 @pytest.fixture(autouse=True)
 def cached_account_email(monkeypatch):
     monkeypatch.setattr(backend, "_ACCOUNT_EMAIL", "you@example.com")
+    monkeypatch.setattr(backend, "_SERVICE", None)  # reset service cache so each test gets its own fake
 
 
 def test_send_email_calls_users_messages_send_with_base64url_raw(fake_service):

@@ -15,7 +15,7 @@ def send_email(
     html: bool = False,
     attachments: list[str] | None = None,
 ) -> str:
-    """Send an email via Gmail SMTP.
+    """Send an email via Gmail.
 
     Args:
         to: Recipient email address(es).

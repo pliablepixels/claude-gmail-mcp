@@ -29,3 +29,7 @@ def test_msgid_hex_to_decimal_round_trip():
 
 def test_msgid_hex_to_decimal_strips_optional_0x_prefix():
     assert links.msgid_hex_to_decimal("0x16fa6a6c0d000000") == "1655752825319194624"
+
+
+def test_msgid_hex_to_decimal_accepts_uppercase():
+    assert links.msgid_hex_to_decimal("16FA6A6C0D000000") == "1655752825319194624"

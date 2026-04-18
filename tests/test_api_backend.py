@@ -145,3 +145,58 @@ def test_search_emails_batch_uses_batch_http_request(fake_service):
     assert "=== Query: q2 ===" in result
     assert fake_service.new_batch_http_request.called
     assert batch.execute.called
+
+
+def test_read_email_returns_url_headers_and_body(fake_service):
+    msg_id = "16fa6a6c0d000000"
+    fake_service.users().messages().get().execute.return_value = {
+        "id": msg_id,
+        "payload": {
+            "headers": [
+                {"name": "From", "value": "alice@example.com"},
+                {"name": "To", "value": "you@example.com"},
+                {"name": "Subject", "value": "Hello"},
+                {"name": "Date", "value": "Sat, 18 Apr 2026 10:00:00 +0000"},
+            ],
+            "mimeType": "text/plain",
+            "body": {"data": base64.urlsafe_b64encode(b"Body text here.").decode()},
+        },
+    }
+
+    result = backend.read_email(msg_id)
+
+    assert f"https://mail.google.com/mail/u/you@example.com/#all/{msg_id}" in result
+    assert "From: alice@example.com" in result
+    assert "Subject: Hello" in result
+    assert "Body text here." in result
+
+
+def test_read_email_extracts_text_plain_from_multipart(fake_service):
+    msg_id = "abc"
+    fake_service.users().messages().get().execute.return_value = {
+        "id": msg_id,
+        "payload": {
+            "headers": [
+                {"name": "From", "value": "alice@example.com"},
+                {"name": "To", "value": "you@example.com"},
+                {"name": "Subject", "value": "Multi"},
+                {"name": "Date", "value": "Date"},
+            ],
+            "mimeType": "multipart/alternative",
+            "parts": [
+                {
+                    "mimeType": "text/plain",
+                    "body": {"data": base64.urlsafe_b64encode(b"plain version").decode()},
+                },
+                {
+                    "mimeType": "text/html",
+                    "body": {"data": base64.urlsafe_b64encode(b"<b>html</b>").decode()},
+                },
+            ],
+        },
+    }
+
+    result = backend.read_email(msg_id)
+
+    assert "plain version" in result
+    assert "<b>html</b>" not in result

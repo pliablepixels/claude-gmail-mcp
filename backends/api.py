@@ -183,3 +183,49 @@ def _run_searches(query_list: list[str], max_results: int) -> dict[str, str]:
             )
 
     return {q: "\n".join(lines) if lines else "No messages found." for q, lines in results.items()}
+
+
+def read_email(uid: str) -> str:
+    msgid_hex = uid
+    try:
+        msg = (
+            _service()
+            .users()
+            .messages()
+            .get(userId="me", id=msgid_hex, format="full")
+            .execute()
+        )
+    except RefreshError:
+        return _AUTH_RETRY_MSG
+    except HttpError as e:
+        return _format_http_error(e)
+
+    payload = msg["payload"]
+    headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
+    url = links.gmail_url(msgid_hex, _account_email())
+    body_text = _extract_text_plain(payload)
+
+    lines = [
+        url,
+        f"From: {headers.get('From', '')}",
+        f"To: {headers.get('To', '')}",
+        f"Subject: {headers.get('Subject', '')}",
+        f"Date: {headers.get('Date', '')}",
+        "",
+        body_text,
+    ]
+    return "\n".join(lines)
+
+
+def _extract_text_plain(payload: dict) -> str:
+    """Walk a Gmail payload tree and return the first text/plain body, decoded."""
+    if payload.get("mimeType") == "text/plain":
+        data = payload.get("body", {}).get("data", "")
+        if data:
+            return base64.urlsafe_b64decode(data.encode()).decode("utf-8", errors="replace")
+
+    for part in payload.get("parts", []) or []:
+        text = _extract_text_plain(part)
+        if text:
+            return text
+    return ""

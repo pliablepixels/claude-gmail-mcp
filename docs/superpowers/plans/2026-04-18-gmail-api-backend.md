@@ -827,7 +827,7 @@ def search_emails(queries: str | list[str], max_results: int = 10) -> str:
     to run several searches in one call (output is sectioned by query, and
     max_results applies per query).
 
-    Returns UID, sender, subject, date, and a Gmail web URL for each match.
+    Returns UID, sender, subject, and date for each match. (Web URLs added in Task 7.)
 
     Args:
         queries: Single query string or list of query strings.
